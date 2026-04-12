@@ -63,6 +63,42 @@ Widget source typecheck:
 swiftc -typecheck -target arm64-apple-macos14.0 -framework SwiftUI -framework WidgetKit Shared/Core/*.swift TmuxMonitorWidget/TmuxMonitorWidgetExtension/*.swift
 ```
 
+Repository verification:
+
+```bash
+./scripts/verify.sh
+```
+
+Release packaging:
+
+```bash
+./scripts/package_release.sh
+```
+
+## CI And Release
+
+- `CI`: `.github/workflows/ci.yml`
+  Runs on every push to `main` and on pull requests.
+  It executes the core harness and an unsigned `xcodebuild` verification build on `macos-14`.
+
+- `Release`: `.github/workflows/release.yml`
+  Runs when a tag like `v0.1.0` is pushed, or manually through `workflow_dispatch`.
+  It verifies the repo, builds an unsigned Release app, zips `Tmux Monitor.app`, generates a SHA-256 checksum, uploads workflow artifacts, and creates a GitHub Release.
+
+### Release Checklist
+
+1. Update `VERSION`
+2. Add a matching section to `CHANGELOG.md`
+3. Commit the release changes
+4. Tag the commit:
+
+   ```bash
+   git tag v$(tr -d '[:space:]' < VERSION)
+   git push origin main --tags
+   ```
+
+The release workflow expects the git tag to match `VERSION` exactly.
+
 ## Notes
 
 - The app is configured for local use, not Mac App Store distribution.
