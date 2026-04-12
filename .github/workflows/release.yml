@@ -21,7 +21,7 @@ jobs:
     steps:
       - name: Resolve tag
         id: meta
-        shell: zsh
+        shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
@@ -41,7 +41,7 @@ jobs:
         run: chmod +x scripts/*.sh
 
       - name: Validate tag against VERSION
-        shell: zsh
+        shell: bash
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
           EXPECTED_TAG="v${VERSION}"
@@ -58,7 +58,7 @@ jobs:
         run: ./scripts/package_release.sh
 
       - name: Extract release notes
-        shell: zsh
+        shell: bash
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
@@ -84,7 +84,7 @@ jobs:
       - name: Publish GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: zsh
+        shell: bash
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
           VERSION="${TAG#v}"
