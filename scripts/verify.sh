@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DERIVED_DATA_DIR="${RUNNER_TEMP:-/tmp}/tmux-monitor-derived-data"
+SWIFT_VERSION_OVERRIDE="${SWIFT_VERSION_OVERRIDE:-5.0}"
 
 cd "$ROOT_DIR"
 
@@ -19,6 +20,7 @@ xcodebuild \
   -configuration Debug \
   -destination 'platform=macOS' \
   -derivedDataPath "$DERIVED_DATA_DIR" \
+  SWIFT_VERSION="$SWIFT_VERSION_OVERRIDE" \
   CODE_SIGNING_ALLOWED=NO \
   build
 

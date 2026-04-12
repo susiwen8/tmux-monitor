@@ -7,6 +7,7 @@ VERSION="$(tr -d '[:space:]' < "$ROOT_DIR/VERSION")"
 DERIVED_DATA_DIR="${DERIVED_DATA_DIR:-${RUNNER_TEMP:-/tmp}/tmux-monitor-release-derived-data}"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/dist}"
 CONFIGURATION="${CONFIGURATION:-Release}"
+SWIFT_VERSION_OVERRIDE="${SWIFT_VERSION_OVERRIDE:-5.0}"
 APP_NAME="Tmux Monitor.app"
 APP_PATH="$DERIVED_DATA_DIR/Build/Products/$CONFIGURATION/$APP_NAME"
 ZIP_PATH="$OUTPUT_DIR/tmux-monitor-${VERSION}.zip"
@@ -24,6 +25,7 @@ xcodebuild \
   -configuration "$CONFIGURATION" \
   -destination 'platform=macOS' \
   -derivedDataPath "$DERIVED_DATA_DIR" \
+  SWIFT_VERSION="$SWIFT_VERSION_OVERRIDE" \
   CODE_SIGNING_ALLOWED=NO \
   build
 
