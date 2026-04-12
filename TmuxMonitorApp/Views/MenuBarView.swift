@@ -12,7 +12,7 @@ struct MenuBarView: View {
             footer
         }
         .padding(16)
-        .frame(width: 520)
+        .frame(width: 560)
     }
 
     private var header: some View {
@@ -100,7 +100,7 @@ struct MenuBarView: View {
                     }
                 }
             }
-            .frame(maxHeight: 460)
+            .frame(maxHeight: 420)
         case .noServer:
             EmptyStateView(
                 title: "tmux Offline",
@@ -166,45 +166,40 @@ private struct SessionCardView: View {
     let onKill: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(session.name)
-                        .font(.headline)
-                    Text("\(session.windowCount) windows • \(session.paneCount) panes")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                StatusBadge(title: session.isAttached ? "Attached" : "Idle", isActive: session.isAttached)
-            }
-
-            if !session.commands.isEmpty {
-                Text(session.commands.joined(separator: "  ·  "))
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(session.name)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(metadataLine)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .layoutPriority(1)
             }
 
-            HStack {
+            Spacer(minLength: 8)
+
+            if let lastActivityAt = session.lastActivityAt {
+                Text(lastActivityAt, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 70, alignment: .trailing)
+            }
+
+            StatusBadge(title: session.isAttached ? "Attached" : "Idle", isActive: session.isAttached)
+
+            HStack(spacing: 8) {
                 Button("Attach", action: onAttach)
                     .buttonStyle(.borderedProminent)
-
+                    .controlSize(.small)
                 Button("Kill", role: .destructive, action: onKill)
                     .buttonStyle(.bordered)
-
-                Spacer()
-
-                if let lastActivityAt = session.lastActivityAt {
-                    Text(lastActivityAt, style: .relative)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                    .controlSize(.small)
             }
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
@@ -213,6 +208,20 @@ private struct SessionCardView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08))
         )
+    }
+
+    private var metadataLine: String {
+        var parts = [
+            "\(session.windowCount)w",
+            "\(session.paneCount)p",
+        ]
+
+        if session.attachedClientCount > 0 {
+            parts.append("\(session.attachedClientCount)c")
+        }
+
+        parts.append(contentsOf: session.commands)
+        return parts.joined(separator: " • ")
     }
 }
 
