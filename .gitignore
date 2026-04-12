@@ -1,0 +1,5 @@
+.DS_Store
+.omx/
+*.xcuserstate
+TmuxMonitor.xcodeproj/project.xcworkspace/xcuserdata/
+TmuxMonitor.xcodeproj/xcuserdata/
