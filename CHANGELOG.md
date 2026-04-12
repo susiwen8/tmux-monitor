@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 - 2026-04-12
+
+### Tooling
+- Fixed the GitHub Actions release workflow to use GitHub-supported shells on hosted runners.
+
 ## 0.1.0 - 2026-04-12
 
 ### Features
