@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 - 2026-04-13
+
+### Fixes
+- Prevent relaunching the menu bar app from collapsing live tmux sessions into an empty snapshot.
+
+### UI
+- Tighten the menu bar session rows so more session data fits in a single line.
+
 ## 0.1.1 - 2026-04-12
 
 ### Tooling
