@@ -123,15 +123,19 @@ final class AppState: ObservableObject {
             let snapshot = await Task.detached(priority: .userInitiated) {
                 let runner = ProcessTmuxCommandRunner(tmuxPath: currentTmuxPath)
                 let service = TmuxSnapshotService(commandRunner: runner)
-                let snapshot = (try? service.loadSnapshot()) ?? .empty(
+                let primarySnapshot = (try? service.loadSnapshot()) ?? .empty(
                     status: .failed,
                     errorMessage: "Failed to read tmux snapshot."
                 )
-                if snapshot.status == .ready, snapshot.sessions.isEmpty {
+                let snapshot: TmuxSnapshot
+                if primarySnapshot.status == .ready, primarySnapshot.sessions.isEmpty {
                     Self.writeEmptySnapshotDiagnostic(
                         using: runner,
                         tmuxPath: currentTmuxPath
                     )
+                    snapshot = Self.recoverSnapshot(using: runner) ?? primarySnapshot
+                } else {
+                    snapshot = primarySnapshot
                 }
                 try? SharedSnapshotStore().save(snapshot)
                 return snapshot
@@ -278,6 +282,108 @@ final class AppState: ObservableObject {
                 try? data.write(to: logURL, options: .atomic)
             }
         }
+    }
+
+    nonisolated private static func recoverSnapshot(
+        using runner: TmuxCommandRunning
+    ) -> TmuxSnapshot? {
+        let now = Date()
+        let sessionsFormat = "#{session_id}|#{session_name}|#{session_windows}|#{session_attached}|#{session_created}|#{session_activity}"
+        let panesFormat = "#{session_id}|#{session_name}|#{pane_id}|#{pane_current_command}|#{pane_active}"
+        let clientsFormat = "#{session_id}|#{session_name}|#{client_name}"
+
+        guard
+            let sessionsResult = try? runner.run(arguments: ["list-sessions", "-F", sessionsFormat]),
+            sessionsResult.exitCode == 0
+        else {
+            return nil
+        }
+
+        let paneRows: [[String]]
+        if
+            let panesResult = try? runner.run(arguments: ["list-panes", "-a", "-F", panesFormat]),
+            panesResult.exitCode == 0
+        {
+            paneRows = parseFallbackRows(panesResult.stdout)
+        } else {
+            paneRows = []
+        }
+
+        let clientRows: [[String]]
+        if
+            let clientsResult = try? runner.run(arguments: ["list-clients", "-F", clientsFormat]),
+            clientsResult.exitCode == 0
+        {
+            clientRows = parseFallbackRows(clientsResult.stdout)
+        } else {
+            clientRows = []
+        }
+
+        let sessions = parseFallbackRows(sessionsResult.stdout)
+            .compactMap { row -> TmuxSessionSummary? in
+                guard row.count >= 6 else {
+                    return nil
+                }
+
+                let sessionID = row[0]
+                let matchingPanes = paneRows.filter { $0.first == sessionID }
+                let matchingClients = clientRows.filter { $0.first == sessionID }
+                let commands = Array(
+                    NSOrderedSet(array: matchingPanes.compactMap { $0.count >= 4 ? $0[3] : nil })
+                ) as? [String] ?? []
+
+                return TmuxSessionSummary(
+                    id: sessionID,
+                    name: row[1],
+                    windowCount: Int(row[2]) ?? 0,
+                    paneCount: matchingPanes.count,
+                    attachedClientCount: matchingClients.count,
+                    createdAt: date(fromEpochString: row[4]),
+                    lastActivityAt: date(fromEpochString: row[5]),
+                    commands: commands.filter { !$0.isEmpty }
+                )
+            }
+            .sorted(by: { lhs, rhs in
+                if lhs.isAttached != rhs.isAttached {
+                    return lhs.isAttached && !rhs.isAttached
+                }
+                let lhsActivity = lhs.lastActivityAt ?? .distantPast
+                let rhsActivity = rhs.lastActivityAt ?? .distantPast
+                if lhsActivity != rhsActivity {
+                    return lhsActivity > rhsActivity
+                }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            })
+
+        guard !sessions.isEmpty else {
+            return nil
+        }
+
+        return TmuxSnapshot(
+            generatedAt: now,
+            status: .ready,
+            sessions: sessions,
+            errorMessage: nil
+        )
+    }
+
+    nonisolated private static func parseFallbackRows(_ output: String) -> [[String]] {
+        output
+            .components(separatedBy: .newlines)
+            .compactMap { line -> [String]? in
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else {
+                    return nil
+                }
+                return trimmed.components(separatedBy: "|")
+            }
+    }
+
+    nonisolated private static func date(fromEpochString value: String) -> Date? {
+        guard let seconds = TimeInterval(value) else {
+            return nil
+        }
+        return Date(timeIntervalSince1970: seconds)
     }
 
     nonisolated private static func message(for error: Error) -> String {

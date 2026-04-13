@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct MenuBarView: View {
     @ObservedObject var appState: AppState
@@ -121,6 +122,13 @@ struct MenuBarView: View {
 
     private var footer: some View {
         HStack {
+            Button {
+                NSApplication.shared.terminate(nil)
+            } label: {
+                Label("Quit", systemImage: "power")
+            }
+            .buttonStyle(.bordered)
+
             SettingsLink {
                 Label("Settings", systemImage: "gearshape")
             }

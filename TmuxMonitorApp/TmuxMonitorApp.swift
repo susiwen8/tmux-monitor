@@ -6,13 +6,19 @@ struct TmuxMonitorApp: App {
 
     init() {
         let state = AppState()
-        state.start()
         _appState = StateObject(wrappedValue: state)
+        Task { @MainActor in
+            state.start()
+        }
     }
 
     var body: some Scene {
         MenuBarExtra(appState.menuBarTitle, systemImage: appState.menuBarSymbolName) {
             MenuBarView(appState: appState)
+                .onAppear {
+                    appState.start()
+                    appState.refresh()
+                }
         }
         .menuBarExtraStyle(.window)
 

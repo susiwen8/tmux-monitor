@@ -86,10 +86,17 @@ struct TmuxSnapshotService {
                 }
                 .sorted(by: Self.sortSessions)
 
+            let resolvedSessions: [TmuxSessionSummary]
+            if sessions.isEmpty, sessionsResult.stdout.nonEmptyTrimmed != nil {
+                resolvedSessions = Self.fallbackSessions(from: sessionsResult.stdout)
+            } else {
+                resolvedSessions = sessions
+            }
+
             return TmuxSnapshot(
                 generatedAt: now,
                 status: .ready,
-                sessions: sessions,
+                sessions: resolvedSessions,
                 errorMessage: nil
             )
         } catch is TmuxCommandLaunchError {
@@ -148,6 +155,37 @@ struct TmuxSnapshotService {
         }
 
         return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+    }
+
+    private static func fallbackSessions(from output: String) -> [TmuxSessionSummary] {
+        output
+            .components(separatedBy: .newlines)
+            .compactMap { line -> TmuxSessionSummary? in
+                let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedLine.isEmpty else {
+                    return nil
+                }
+
+                let fields = trimmedLine
+                    .replacingOccurrences(of: "\r", with: "")
+                    .components(separatedBy: "\t")
+
+                guard fields.count >= 6 else {
+                    return nil
+                }
+
+                return TmuxSessionSummary(
+                    id: fields[0],
+                    name: fields[1],
+                    windowCount: Int(fields[2]) ?? 0,
+                    paneCount: 0,
+                    attachedClientCount: Int(fields[3]) ?? 0,
+                    createdAt: date(fromEpochString: fields[4]),
+                    lastActivityAt: date(fromEpochString: fields[5]),
+                    commands: []
+                )
+            }
+            .sorted(by: sortSessions)
     }
 }
 
