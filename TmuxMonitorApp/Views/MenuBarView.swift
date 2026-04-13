@@ -12,8 +12,8 @@ struct MenuBarView: View {
             Divider()
             footer
         }
-        .padding(16)
-        .frame(width: 560)
+        .padding(14)
+        .frame(width: 500)
     }
 
     private var header: some View {
@@ -174,7 +174,7 @@ private struct SessionCardView: View {
     let onKill: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(session.name)
                     .font(.headline)
@@ -186,18 +186,18 @@ private struct SessionCardView: View {
                     .layoutPriority(1)
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
             if let lastActivityAt = session.lastActivityAt {
                 Text(lastActivityAt, style: .relative)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .frame(minWidth: 70, alignment: .trailing)
+                    .frame(minWidth: 58, alignment: .trailing)
             }
 
             StatusBadge(title: session.isAttached ? "Attached" : "Idle", isActive: session.isAttached)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Button("Attach", action: onAttach)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
@@ -206,8 +206,8 @@ private struct SessionCardView: View {
                     .controlSize(.small)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
@@ -239,9 +239,9 @@ private struct StatusBadge: View {
 
     var body: some View {
         Text(title.uppercased())
-            .font(.system(size: 10, weight: .bold, design: .rounded))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
             .background(isActive ? Color.green.opacity(0.15) : Color.gray.opacity(0.12))
             .foregroundStyle(isActive ? Color.green : Color.secondary)
             .clipShape(Capsule())
