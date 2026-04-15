@@ -1,6 +1,33 @@
 import Foundation
 import WidgetKit
 
+enum SessionPrimaryAction: Equatable {
+    case attach
+    case detach
+
+    init(session: TmuxSessionSummary) {
+        self = session.isAttached ? .detach : .attach
+    }
+
+    var buttonTitle: String {
+        switch self {
+        case .attach:
+            return "Attach"
+        case .detach:
+            return "Detach"
+        }
+    }
+
+    func tmuxArguments(for sessionName: String) -> [String]? {
+        switch self {
+        case .attach:
+            return nil
+        case .detach:
+            return ["detach-client", "-s", sessionName]
+        }
+    }
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published private(set) var snapshot: TmuxSnapshot
@@ -152,7 +179,7 @@ final class AppState: ObservableObject {
                 self.statusMessage = errorMessage
             } else if snapshot.status == .noServer {
                 self.statusMessage = "tmux server is not running."
-            } else if self.statusMessage?.hasPrefix("Created ") == true || self.statusMessage?.hasPrefix("Killed ") == true {
+            } else if Self.shouldPreserveActionStatusMessage(self.statusMessage) {
                 // Preserve the latest action confirmation.
             } else {
                 self.statusMessage = nil
@@ -189,6 +216,19 @@ final class AppState: ObservableObject {
         } catch {
             statusMessage = Self.message(for: error)
         }
+    }
+
+    func triggerPrimaryAction(for session: TmuxSessionSummary) {
+        switch SessionPrimaryAction(session: session) {
+        case .attach:
+            attach(to: session)
+        case .detach:
+            detach(from: session)
+        }
+    }
+
+    func primaryAction(for session: TmuxSessionSummary) -> SessionPrimaryAction {
+        SessionPrimaryAction(session: session)
     }
 
     private func scheduleTimer() {
@@ -242,6 +282,13 @@ final class AppState: ObservableObject {
                 self.refresh()
             }
         }
+    }
+
+    private func detach(from session: TmuxSessionSummary) {
+        runTmuxCommand(
+            ["detach-client", "-s", session.name],
+            successMessage: "Detached clients from \(session.name)."
+        )
     }
 
     private func resolvedTmuxPath() -> String {
@@ -392,5 +439,15 @@ final class AppState: ObservableObject {
         }
 
         return error.localizedDescription
+    }
+
+    nonisolated static func shouldPreserveActionStatusMessage(_ statusMessage: String?) -> Bool {
+        guard let statusMessage else {
+            return false
+        }
+
+        return statusMessage.hasPrefix("Created ")
+            || statusMessage.hasPrefix("Killed ")
+            || statusMessage.hasPrefix("Detached ")
     }
 }
