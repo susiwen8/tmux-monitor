@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.3 - 2026-04-15
+
+### Fixes
+- Keep live tmux sessions actionable by switching attached rows from `Attach` to `Detach`.
+- Preserve detach confirmations after refresh so session actions do not disappear immediately.
+
+### UI
+- Compress the menu header and return more vertical space to the live session list.
+- Rework session rows so status, activity, and primary actions stay readable without horizontal crowding.
+
+### Tooling
+- Add an app-level harness to verify attach/detach button behavior and include it in `scripts/verify.sh`.
+
 ## 0.1.2 - 2026-04-13
 
 ### Fixes
