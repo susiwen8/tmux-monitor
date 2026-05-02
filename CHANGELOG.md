@@ -5,6 +5,7 @@
 ### Fixes
 - Keep live tmux sessions actionable by switching attached rows from `Attach` to `Detach`.
 - Preserve detach confirmations after refresh so session actions do not disappear immediately.
+- Default session attach to Ghostty and fallback to iTerm2, then Terminal, when the preferred app is unavailable.
 
 ### UI
 - Compress the menu header and return more vertical space to the live session list.

@@ -15,10 +15,24 @@ struct TerminalLauncher {
     let terminalApp: TerminalApp
     let tmuxPath: String
 
-    func attach(to sessionName: String) throws {
+    @discardableResult
+    func attach(to sessionName: String) throws -> TerminalApp {
         let command = "\(shellQuoted(tmuxPath)) attach -t \(shellQuoted(sessionName))"
-        let script = scriptLines(for: command)
+        var lastError: Error?
 
+        for candidate in terminalApp.fallbackOrder {
+            do {
+                try runAppleScript(scriptLines(for: command, terminalApp: candidate))
+                return candidate
+            } catch {
+                lastError = error
+            }
+        }
+
+        throw lastError ?? TerminalLaunchError.scriptFailed("The terminal app could not be controlled.")
+    }
+
+    private func runAppleScript(_ script: [String]) throws {
         let process = Process()
         let stderrPipe = Pipe()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -43,10 +57,19 @@ struct TerminalLauncher {
         }
     }
 
-    private func scriptLines(for command: String) -> [String] {
+    private func scriptLines(for command: String, terminalApp: TerminalApp) -> [String] {
         let escapedCommand = appleScriptEscaped(command)
 
         switch terminalApp {
+        case .ghostty:
+            return [
+                "tell application id \"com.mitchellh.ghostty\"",
+                "activate",
+                "set ghosttyConfig to new surface configuration",
+                "set command of ghosttyConfig to \"\(escapedCommand)\"",
+                "new window with configuration ghosttyConfig",
+                "end tell",
+            ]
         case .terminal:
             return [
                 "tell application \"Terminal\"",

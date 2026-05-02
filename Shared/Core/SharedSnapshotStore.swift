@@ -91,6 +91,10 @@ struct SharedSnapshotStore {
     }
 
     private func readCandidateFileURLs() -> [URL] {
+        guard suiteName == AppConstants.appGroupID else {
+            return []
+        }
+
         var urls: [URL] = []
         if let groupURL = groupContainerSnapshotURL() {
             urls.append(groupURL)
@@ -100,6 +104,10 @@ struct SharedSnapshotStore {
     }
 
     private func writeCandidateFileURLs() -> [URL] {
+        guard suiteName == AppConstants.appGroupID else {
+            return []
+        }
+
         var urls: [URL] = []
         if let groupURL = groupContainerSnapshotURL() {
             urls.append(groupURL)

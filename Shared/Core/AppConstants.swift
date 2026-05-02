@@ -22,17 +22,31 @@ enum AppConstants {
 }
 
 enum TerminalApp: String, CaseIterable, Codable, Identifiable {
-    case terminal
+    case ghostty
     case iTerm
+    case terminal
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
+        case .ghostty:
+            return "Ghostty"
+        case .iTerm:
+            return "iTerm2"
         case .terminal:
             return "Terminal"
+        }
+    }
+
+    var fallbackOrder: [TerminalApp] {
+        switch self {
+        case .ghostty:
+            return [.ghostty, .iTerm, .terminal]
         case .iTerm:
-            return "iTerm"
+            return [.iTerm, .terminal]
+        case .terminal:
+            return [.terminal]
         }
     }
 }

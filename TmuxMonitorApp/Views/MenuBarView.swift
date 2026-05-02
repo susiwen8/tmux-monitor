@@ -13,7 +13,7 @@ struct MenuBarView: View {
             footer
         }
         .padding(10)
-        .frame(width: 440)
+        .frame(width: 500)
     }
 
     private var header: some View {
@@ -130,19 +130,21 @@ struct MenuBarView: View {
                 }
 
                 ScrollView {
-                    VStack(spacing: 8) {
+                    LazyVStack(spacing: 7) {
                         ForEach(appState.snapshot.sessions) { session in
                             SessionCardView(
                                 session: session,
                                 primaryActionTitle: appState.primaryAction(for: session).buttonTitle,
                                 onPrimaryAction: { appState.triggerPrimaryAction(for: session) },
+                                onRename: { appState.rename(session: session, to: $0) },
                                 onKill: { appState.sessionPendingKill = session }
                             )
                         }
                     }
                 }
-                .frame(maxHeight: 460)
+                .frame(minHeight: 260, idealHeight: 360, maxHeight: 520)
             }
+            .layoutPriority(1)
         case .noServer:
             EmptyStateView(
                 title: "tmux Offline",
@@ -248,61 +250,150 @@ private struct SessionCardView: View {
     let session: TmuxSessionSummary
     let primaryActionTitle: String
     let onPrimaryAction: () -> Void
+    let onRename: (String) -> Void
     let onKill: () -> Void
 
+    @State private var isRenaming = false
+    @State private var draftName = ""
+    @FocusState private var renameFieldFocused: Bool
+
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(session.name)
-                        .font(.headline)
-                        .lineLimit(1)
-                    StatusBadge(title: session.isAttached ? "Attached" : "Idle", isActive: session.isAttached)
-                }
-                .layoutPriority(1)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 8) {
+                titleArea
+                    .layoutPriority(1)
 
-                Text(metadataLine)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if let lastActivityAt = session.lastActivityAt {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock")
-                        Text("Last active")
-                        Text(lastActivityAt, style: .relative)
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                if !isRenaming {
+                    Spacer(minLength: 8)
+                    actionButtons
                 }
             }
-            .help(detailLine)
 
-            Spacer(minLength: 8)
-
-            VStack(alignment: .trailing, spacing: 6) {
-                Button(primaryActionTitle, action: onPrimaryAction)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                Button(role: .destructive, action: onKill) {
-                    Image(systemName: "trash")
-                }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .help("Kill session")
-            }
+            metadataRow
         }
+        .help(detailLine)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
-        .padding(.vertical, 9)
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(cardFillColor)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(cardStrokeColor)
         )
+        .onAppear {
+            if draftName.isEmpty {
+                draftName = session.name
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var titleArea: some View {
+        if isRenaming {
+            HStack(spacing: 6) {
+                TextField("Session name", text: $draftName)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.headline)
+                    .focused($renameFieldFocused)
+                    .onSubmit(commitRename)
+
+                Button(action: commitRename) {
+                    Image(systemName: "checkmark")
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .disabled(!canSaveRename)
+                .help("Save session name")
+
+                Button(action: cancelRename) {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .help("Cancel rename")
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(session.name)
+                    .font(.headline)
+                    .lineLimit(1)
+                StatusBadge(title: session.isAttached ? "Attached" : "Idle", isActive: session.isAttached)
+                Button(action: beginRename) {
+                    Image(systemName: "pencil")
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .help("Rename session")
+            }
+        }
+    }
+
+    private var metadataRow: some View {
+        HStack(spacing: 4) {
+            Text(metadataLine)
+                .layoutPriority(1)
+                .lineLimit(1)
+
+            if let lastActivityAt = session.lastActivityAt {
+                Text("•")
+                Image(systemName: "clock")
+                    .imageScale(.small)
+                Text(lastActivityAt, style: .relative)
+                    .lineLimit(1)
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 6) {
+            Button(primaryActionTitle, action: onPrimaryAction)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            Button(role: .destructive, action: onKill) {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Kill session")
+        }
+    }
+
+    private var trimmedDraftName: String {
+        draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var canSaveRename: Bool {
+        !trimmedDraftName.isEmpty && trimmedDraftName != session.name
+    }
+
+    private func beginRename() {
+        draftName = session.name
+        isRenaming = true
+        DispatchQueue.main.async {
+            renameFieldFocused = true
+        }
+    }
+
+    private func commitRename() {
+        guard canSaveRename else {
+            return
+        }
+
+        let newName = trimmedDraftName
+        isRenaming = false
+        renameFieldFocused = false
+        onRename(newName)
+    }
+
+    private func cancelRename() {
+        draftName = session.name
+        isRenaming = false
+        renameFieldFocused = false
     }
 
     private var metadataLine: String {

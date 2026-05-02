@@ -28,6 +28,38 @@ enum SessionPrimaryAction: Equatable {
     }
 }
 
+enum SessionRenameValidationError: Error, Equatable {
+    case empty
+    case unchanged
+}
+
+struct SessionRenameCommand: Equatable {
+    let arguments: [String]
+    let successMessage: String
+
+    static func build(
+        session: TmuxSessionSummary,
+        proposedName: String
+    ) -> Result<SessionRenameCommand, SessionRenameValidationError> {
+        let trimmedName = proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedName.isEmpty else {
+            return .failure(.empty)
+        }
+
+        guard trimmedName != session.name else {
+            return .failure(.unchanged)
+        }
+
+        return .success(
+            SessionRenameCommand(
+                arguments: ["rename-session", "-t", session.id, trimmedName],
+                successMessage: "Renamed \(session.name) to \(trimmedName)."
+            )
+        )
+    }
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published private(set) var snapshot: TmuxSnapshot
@@ -95,7 +127,7 @@ final class AppState: ObservableObject {
         {
             self.terminalApp = terminal
         } else {
-            self.terminalApp = .terminal
+            self.terminalApp = .ghostty
         }
 
         self.snapshot = (try? SharedSnapshotStore().load()) ?? .empty(status: .noServer)
@@ -205,13 +237,13 @@ final class AppState: ObservableObject {
 
     func attach(to session: TmuxSessionSummary) {
         do {
-            try TerminalLauncher(
+            let launchedTerminal = try TerminalLauncher(
                 terminalApp: terminalApp,
                 tmuxPath: resolvedTmuxPath()
             )
             .attach(to: session.name)
 
-            statusMessage = "Opening \(session.name) in \(terminalApp.displayName)."
+            statusMessage = "Opening \(session.name) in \(launchedTerminal.displayName)."
             refresh()
         } catch {
             statusMessage = Self.message(for: error)
@@ -229,6 +261,20 @@ final class AppState: ObservableObject {
 
     func primaryAction(for session: TmuxSessionSummary) -> SessionPrimaryAction {
         SessionPrimaryAction(session: session)
+    }
+
+    func rename(session: TmuxSessionSummary, to proposedName: String) {
+        switch SessionRenameCommand.build(session: session, proposedName: proposedName) {
+        case let .success(command):
+            runTmuxCommand(
+                command.arguments,
+                successMessage: command.successMessage
+            )
+        case .failure(.empty):
+            statusMessage = "Session name cannot be empty."
+        case .failure(.unchanged):
+            statusMessage = nil
+        }
     }
 
     private func scheduleTimer() {
@@ -322,7 +368,7 @@ final class AppState: ObservableObject {
         if let data = payload.data(using: .utf8) {
             if FileManager.default.fileExists(atPath: logURL.path),
                let handle = try? FileHandle(forWritingTo: logURL) {
-                try? handle.seekToEnd()
+                _ = try? handle.seekToEnd()
                 try? handle.write(contentsOf: data)
                 try? handle.close()
             } else {
@@ -449,5 +495,6 @@ final class AppState: ObservableObject {
         return statusMessage.hasPrefix("Created ")
             || statusMessage.hasPrefix("Killed ")
             || statusMessage.hasPrefix("Detached ")
+            || statusMessage.hasPrefix("Renamed ")
     }
 }

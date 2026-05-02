@@ -102,5 +102,5 @@ The release workflow expects the git tag to match `VERSION` exactly.
 ## Notes
 
 - The app is configured for local use, not Mac App Store distribution.
-- `Terminal` and `iTerm` attach flows use Apple Events via `osascript`.
+- `Ghostty`, `iTerm2`, and `Terminal` attach flows use Apple Events via `osascript`, with Ghostty as the default attach target for new installs.
 - If the widget stays empty, verify signing, App Group entitlement alignment, and that the app has refreshed at least once.

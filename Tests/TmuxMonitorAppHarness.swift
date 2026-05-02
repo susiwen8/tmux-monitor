@@ -5,6 +5,12 @@ enum TmuxMonitorAppHarness {
     static func main() throws {
         try attachedSessionUsesDetachPrimaryAction()
         try idleSessionUsesAttachPrimaryAction()
+        try defaultsToGhosttyForAttach()
+        try terminalAppsPreferGhosttyThenITermThenTerminal()
+        try terminalFallbackChainsStayStable()
+        try sessionRenameCommandTargetsStableSessionID()
+        try emptySessionRenameIsRejected()
+        try unchangedSessionRenameIsRejected()
         try detachedStatusMessageIsPreserved()
         print("TmuxMonitor app checks passed.")
     }
@@ -50,10 +56,116 @@ enum TmuxMonitorAppHarness {
         try expect(action.tmuxArguments(for: session.name) == nil, "Attach should not run a direct tmux command.")
     }
 
+    @MainActor
+    private static func defaultsToGhosttyForAttach() throws {
+        let suiteName = "TmuxMonitorAppHarness-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let state = AppState(userDefaults: defaults)
+
+        try expect(
+            state.terminalApp.rawValue == "ghostty",
+            "New installs should default attach to Ghostty."
+        )
+    }
+
+    private static func terminalAppsPreferGhosttyThenITermThenTerminal() throws {
+        try expect(
+            TerminalApp.allCases.map(\.rawValue) == ["ghostty", "iTerm", "terminal"],
+            "Attach preference order should be Ghostty, then iTerm, then Terminal."
+        )
+    }
+
+    private static func terminalFallbackChainsStayStable() throws {
+        try expect(
+            TerminalApp.ghostty.fallbackOrder == [.ghostty, .iTerm, .terminal],
+            "Ghostty should fall back to iTerm2 and then Terminal."
+        )
+        try expect(
+            TerminalApp.iTerm.fallbackOrder == [.iTerm, .terminal],
+            "iTerm2 should fall back to Terminal."
+        )
+        try expect(
+            TerminalApp.terminal.fallbackOrder == [.terminal],
+            "Terminal should remain the final fallback with no extra hops."
+        )
+    }
+
+    private static func sessionRenameCommandTargetsStableSessionID() throws {
+        let session = TmuxSessionSummary(
+            id: "$9",
+            name: "old-name",
+            windowCount: 1,
+            paneCount: 1,
+            attachedClientCount: 0,
+            createdAt: nil,
+            lastActivityAt: nil,
+            commands: []
+        )
+
+        let command = try SessionRenameCommand.build(
+            session: session,
+            proposedName: "  new-name  "
+        ).get()
+
+        try expect(
+            command.arguments == ["rename-session", "-t", "$9", "new-name"],
+            "Rename should target the stable tmux session id and trim the new name."
+        )
+        try expect(
+            command.successMessage == "Renamed old-name to new-name.",
+            "Rename should expose a status message that identifies both names."
+        )
+    }
+
+    private static func emptySessionRenameIsRejected() throws {
+        let session = TmuxSessionSummary(
+            id: "$9",
+            name: "old-name",
+            windowCount: 1,
+            paneCount: 1,
+            attachedClientCount: 0,
+            createdAt: nil,
+            lastActivityAt: nil,
+            commands: []
+        )
+
+        let result = SessionRenameCommand.build(session: session, proposedName: "   ")
+
+        try expect(
+            result == .failure(.empty),
+            "Empty session names should be rejected before calling tmux."
+        )
+    }
+
+    private static func unchangedSessionRenameIsRejected() throws {
+        let session = TmuxSessionSummary(
+            id: "$9",
+            name: "old-name",
+            windowCount: 1,
+            paneCount: 1,
+            attachedClientCount: 0,
+            createdAt: nil,
+            lastActivityAt: nil,
+            commands: []
+        )
+
+        let result = SessionRenameCommand.build(session: session, proposedName: "old-name")
+
+        try expect(
+            result == .failure(.unchanged),
+            "Unchanged session names should not call tmux."
+        )
+    }
+
     private static func detachedStatusMessageIsPreserved() throws {
         try expect(
             AppState.shouldPreserveActionStatusMessage("Detached clients from alpha."),
             "Detach confirmation should survive the next refresh."
+        )
+        try expect(
+            AppState.shouldPreserveActionStatusMessage("Renamed alpha to beta."),
+            "Rename confirmation should survive the next refresh."
         )
         try expect(
             !AppState.shouldPreserveActionStatusMessage("Opening alpha in Terminal."),
